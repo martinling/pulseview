@@ -98,8 +98,7 @@ configure_file (
 #= Sources
 #-------------------------------------------------------------------------------
 
-set(pulseview_SOURCES
-	main.cpp
+set(pulseview_CLASS_SOURCES
 	pv/mainwindow.cpp
 	pv/sigsession.cpp
 	pv/data/analog.cpp
@@ -129,6 +128,11 @@ set(pulseview_SOURCES
 	pv/view/timemarker.cpp
 	pv/view/view.cpp
 	pv/view/viewport.cpp
+)
+
+set(pulseview_SOURCES
+	main.cpp
+	${pulseview_CLASS_SOURCES}
 )
 
 set(pulseview_HEADERS
@@ -223,7 +227,12 @@ add_executable(${PROJECT_NAME}
 	${pulseview_RESOURCES_RCC}
 )
 
+add_library(pv SHARED
+	${pulseview_CLASS_SOURCES}
+)
+
 target_link_libraries(${PROJECT_NAME} ${PULSEVIEW_LINK_LIBS})
+target_link_libraries(pv ${PULSEVIEW_LINK_LIBS})
 
 #===============================================================================
 #= Installation

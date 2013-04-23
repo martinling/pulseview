@@ -2,6 +2,7 @@
 
 pulseview
 pulseview-test
+libpv.so
 
 # CMake cruft
 CMakeCache.txt
@@ -20,3 +21,6 @@ qrc_*.cxx
 ui_*.h
 
 config.h
+
+# python bindings build directory
+bindings/python/build
