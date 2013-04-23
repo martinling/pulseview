@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<typesystem package="pulseview">
+<typesystem package="pv">
     <load-typesystem name="typesystem_core.xml" generate="no" />
     <namespace-type name="pv">
         <namespace-type name="view">

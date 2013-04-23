@@ -30,6 +30,7 @@ project(pulseview)
 option(DISABLE_WERROR "Build without -Werror" FALSE)
 option(ENABLE_SIGNALS "Build with UNIX signals" TRUE)
 option(ENABLE_SIGROKDECODE "Build with libsigrokdecode" FALSE)
+option(ENABLE_PYTHON "Build Python bindings" FALSE)
 option(ENABLE_TESTS "Enable unit tests" FALSE)
 option(STATIC_PKGDEPS_LIBS "Statically link to (pkgconfig) libraries" FALSE)
 
@@ -220,25 +221,33 @@ else()
 	list(APPEND PULSEVIEW_LINK_LIBS ${PKGDEPS_LIBRARIES})
 endif()
 
-add_executable(${PROJECT_NAME}
+add_executable(${PROJECT_NAME}-bin
 	${pulseview_SOURCES}
 	${pulseview_HEADERS_MOC}
 	${pulseview_FORMS_HEADERS}
 	${pulseview_RESOURCES_RCC}
 )
 
-add_library(pv SHARED
+set_property(
+	TARGET ${PROJECT_NAME}-bin
+	PROPERTY OUTPUT_NAME ${PROJECT_NAME})
+
+add_library(${PROJECT_NAME}-lib SHARED
 	${pulseview_CLASS_SOURCES}
 )
 
-target_link_libraries(${PROJECT_NAME} ${PULSEVIEW_LINK_LIBS})
-target_link_libraries(pv ${PULSEVIEW_LINK_LIBS})
+set_property(
+	TARGET ${PROJECT_NAME}-lib
+	PROPERTY OUTPUT_NAME ${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME}-bin ${PULSEVIEW_LINK_LIBS})
+target_link_libraries(${PROJECT_NAME}-lib ${PULSEVIEW_LINK_LIBS})
 
 #===============================================================================
 #= Installation
 #-------------------------------------------------------------------------------
 
-install(TARGETS ${PROJECT_NAME} DESTINATION bin/)
+install(TARGETS ${PROJECT_NAME}-bin DESTINATION bin/)
 
 #===============================================================================
 #= Packaging (handled by CPack)
@@ -265,3 +274,11 @@ if(ENABLE_TESTS)
 	enable_testing()
 	add_test(test ${CMAKE_CURRENT_BINARY_DIR}/test/pulseview-test)
 endif(ENABLE_TESTS)
+
+#===============================================================================
+#= Python bindings
+#-------------------------------------------------------------------------------
+
+if(ENABLE_PYTHON)
+	add_subdirectory(python)
+endif(ENABLE_PYTHON)
