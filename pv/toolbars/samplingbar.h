@@ -33,6 +33,7 @@
 #include <pv/sigsession.h>
 #include <pv/popups/probes.h>
 #include <pv/widgets/popuptoolbutton.h>
+#include <pv/widgets/sweeptimingwidget.h>
 
 struct st_dev_inst;
 class QAction;
@@ -89,11 +90,8 @@ private:
 
 	QComboBox _record_length_selector;
 
-	QAction *_sample_rate_action;
-	QComboBox _sample_rate_list;
-	QAction *_sample_rate_list_action;
-	QDoubleSpinBox _sample_rate_value;
-	QAction *_sample_rate_value_action;
+	pv::widgets::SweepTimingWidget _sample_rate;
+	bool _updating_sample_rate;
 
 	QIcon _icon_red;
 	QIcon _icon_green;
