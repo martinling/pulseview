@@ -20,6 +20,9 @@
 
 #include "sweeptimingwidget.h"
 
+#include <libsigrok/libsigrok.h>
+#include <assert.h>
+
 namespace pv {
 namespace widgets {
 
@@ -87,7 +90,7 @@ void SweepTimingWidget::show_list(const uint64_t *vals, size_t count)
 	_list.clear();
 	for (size_t i = 0; i < count; i++)
 	{
-		char *const s = sr_samplerate_string(vals[i]);
+		char *const s = sr_si_string_u64(vals[i], _value.suffix().toLocal8Bit());
 		_list.addItem(QString::fromUtf8(s),
 			qVariantFromValue(vals[i]));
 		g_free(s);

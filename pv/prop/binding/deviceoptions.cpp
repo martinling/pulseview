@@ -32,22 +32,30 @@
 #include <pv/prop/enum.h>
 #include <pv/prop/int.h>
 
-using namespace boost;
-using namespace std;
+using boost::bind;
+using boost::function;
+using boost::optional;
+using boost::shared_ptr;
+using std::make_pair;
+using std::pair;
+using std::string;
+using std::vector;
 
 namespace pv {
 namespace prop {
 namespace binding {
 
-DeviceOptions::DeviceOptions(struct sr_dev_inst *sdi) :
-	_sdi(sdi)
+DeviceOptions::DeviceOptions(const sr_dev_inst *sdi,
+	const sr_probe_group *group) :
+	_sdi(sdi),
+	_group(group)
 {
 	assert(sdi);
 
 	GVariant *gvar_opts, *gvar_list;
 	gsize num_opts;
 
-	if ((sr_config_list(sdi->driver, sdi, NULL, SR_CONF_DEVICE_OPTIONS,
+	if ((sr_config_list(sdi->driver, sdi, group, SR_CONF_DEVICE_OPTIONS,
 		&gvar_opts) != SR_OK))
 		/* Driver supports no device instance options. */
 		return;
@@ -63,7 +71,8 @@ DeviceOptions::DeviceOptions(struct sr_dev_inst *sdi) :
 
 		const int key = info->key;
 
-		if (sr_config_list(_sdi->driver, _sdi, NULL, key, &gvar_list) != SR_OK)
+		if (sr_config_list(_sdi->driver, _sdi, group,
+			key, &gvar_list) != SR_OK)
 			gvar_list = NULL;
 
 		const QString name = QString::fromUtf8(info->name);
@@ -111,10 +120,10 @@ DeviceOptions::DeviceOptions(struct sr_dev_inst *sdi) :
 }
 
 GVariant* DeviceOptions::config_getter(
-	const struct sr_dev_inst *sdi, int key)
+	const sr_dev_inst *sdi, const sr_probe_group *group, int key)
 {
 	GVariant *data = NULL;
-	if (sr_config_get(sdi->driver, sdi, NULL, key, &data) != SR_OK) {
+	if (sr_config_get(sdi->driver, sdi, group, key, &data) != SR_OK) {
 		qDebug() <<
 			"WARNING: Failed to get value of config id" << key;
 		return NULL;
@@ -123,17 +132,18 @@ GVariant* DeviceOptions::config_getter(
 }
 
 void DeviceOptions::config_setter(
-	const struct sr_dev_inst *sdi, int key, GVariant* value)
+	const struct sr_dev_inst *sdi, const sr_probe_group *group, int key,
+	GVariant* value)
 {
-	if (sr_config_set(sdi, NULL, key, value) != SR_OK)
+	if (sr_config_set(sdi, group, key, value) != SR_OK)
 		qDebug() << "WARNING: Failed to set value of sample rate";
 }
 
 void DeviceOptions::bind_bool(const QString &name, int key)
 {
 	_properties.push_back(shared_ptr<Property>(
-		new Bool(name, bind(config_getter, _sdi, key),
-			bind(config_setter, _sdi, key, _1))));
+		new Bool(name, bind(config_getter, _sdi, _group, key),
+			bind(config_setter, _sdi, _group, key, _1))));
 }
 
 void DeviceOptions::bind_enum(const QString &name, int key,
@@ -151,8 +161,8 @@ void DeviceOptions::bind_enum(const QString &name, int key,
 
 	_properties.push_back(shared_ptr<Property>(
 		new Enum(name, values,
-			bind(config_getter, _sdi, key),
-			bind(config_setter, _sdi, key, _1))));
+			bind(config_getter, _sdi, _group, key),
+			bind(config_setter, _sdi, _group, key, _1))));
 }
 
 void DeviceOptions::bind_int(const QString &name, int key, QString suffix,
@@ -160,8 +170,8 @@ void DeviceOptions::bind_int(const QString &name, int key, QString suffix,
 {
 	_properties.push_back(shared_ptr<Property>(
 		new Int(name, suffix, range,
-			bind(config_getter, _sdi, key),
-			bind(config_setter, _sdi, key, _1))));
+			bind(config_getter, _sdi, _group, key),
+			bind(config_setter, _sdi, _group, key, _1))));
 }
 
 QString DeviceOptions::print_gvariant(GVariant *const gvar)

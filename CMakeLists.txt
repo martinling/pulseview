@@ -1,4 +1,4 @@
-
+##
 ## This file is part of the PulseView project.
 ##
 ## Copyright (C) 2012 Joel Holdsworth <joel@airwebreathe.org.uk>
@@ -23,8 +23,7 @@ cmake_minimum_required(VERSION 2.8.6)
 include(FindPkgConfig)
 include(GNUInstallDirs)
 
-set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake")
-include(cotire)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake")
 
 project(pulseview)
 
@@ -35,8 +34,9 @@ project(pulseview)
 option(DISABLE_WERROR "Build without -Werror" FALSE)
 option(ENABLE_SIGNALS "Build with UNIX signals" TRUE)
 option(ENABLE_DECODE "Build with libsigrokdecode" FALSE)
+option(ENABLE_COTIRE "Enable cotire" FALSE)
 option(ENABLE_TESTS "Enable unit tests" FALSE)
-option(STATIC_PKGDEPS_LIBS "Statically link to (pkgconfig) libraries" FALSE)
+option(STATIC_PKGDEPS_LIBS "Statically link to (pkg-config) libraries" FALSE)
 
 if(WIN32)
 	# On Windows/MinGW we need to statically link to libraries.
@@ -44,10 +44,10 @@ if(WIN32)
 	set(STATIC_PKGDEPS_LIBS TRUE)
 
 	# For boost-thread we need two additional settings on win32:
-	set(Boost_USE_STATIC_LIBS on)
+	set(Boost_USE_STATIC_LIBS ON)
 	add_definitions(-DBOOST_THREAD_USE_LIB)
 
-	# Windsws does not support UNIX signals
+	# Windows does not support UNIX signals.
 	set(ENABLE_SIGNALS FALSE)
 endif()
 
@@ -55,9 +55,7 @@ endif()
 #= Dependencies
 #-------------------------------------------------------------------------------
 
-list(APPEND PKGDEPS
-	libsigrok>=0.2.0
-)
+list(APPEND PKGDEPS libsigrok>=0.2.0)
 
 if(ENABLE_DECODE)
 	list(APPEND PKGDEPS libsigrokdecode>=0.2.0)
@@ -66,7 +64,7 @@ endif()
 find_package(PkgConfig)
 pkg_check_modules(PKGDEPS REQUIRED ${PKGDEPS})
 
-FIND_PROGRAM(QT_QMAKE_EXECUTABLE NAMES qmake4 qmake-qt4 qmake-mac)
+find_program(QT_QMAKE_EXECUTABLE NAMES qmake4 qmake-qt4 qmake-mac)
 find_package(Qt4 REQUIRED)
 
 # Find the platform's thread library (needed for boost-thread).
@@ -74,11 +72,11 @@ find_package(Qt4 REQUIRED)
 find_package(Threads)
 
 if(WIN32)
-# On Windows/MinGW the we need to use 'thread_win32' instead of 'thread'.
-# The library is named libboost_thread_win32* (not libboost_thread*).
-find_package(Boost 1.42 COMPONENTS system thread_win32 REQUIRED)
+	# On Windows/MinGW we need to use 'thread_win32' instead of 'thread'.
+	# The library is named libboost_thread_win32* (not libboost_thread*).
+	find_package(Boost 1.42 COMPONENTS system thread_win32 REQUIRED)
 else()
-find_package(Boost 1.42 COMPONENTS system thread REQUIRED)
+	find_package(Boost 1.42 COMPONENTS system thread REQUIRED)
 endif()
 
 #===============================================================================
@@ -109,6 +107,7 @@ set(pulseview_SOURCES
 	pv/devicemanager.cpp
 	pv/mainwindow.cpp
 	pv/sigsession.cpp
+	pv/storesession.cpp
 	pv/data/analog.cpp
 	pv/data/analogsnapshot.cpp
 	pv/data/logic.cpp
@@ -117,6 +116,7 @@ set(pulseview_SOURCES
 	pv/data/snapshot.cpp
 	pv/dialogs/about.cpp
 	pv/dialogs/connect.cpp
+	pv/dialogs/storeprogress.cpp
 	pv/popups/deviceoptions.cpp
 	pv/popups/probes.cpp
 	pv/prop/bool.cpp
@@ -150,12 +150,14 @@ set(pulseview_SOURCES
 	pv/widgets/wellarray.cpp
 )
 
-# This list includes only QObject derrived class headers
+# This list includes only QObject derived class headers.
 set(pulseview_HEADERS
 	pv/mainwindow.h
 	pv/sigsession.h
+	pv/storesession.h
 	pv/dialogs/about.h
 	pv/dialogs/connect.h
+	pv/dialogs/storeprogress.h
 	pv/popups/probes.h
 	pv/popups/deviceoptions.h
 	pv/prop/bool.h
@@ -217,6 +219,13 @@ if(ENABLE_DECODE)
 	)
 endif()
 
+if(WIN32)
+	# Use the sigrok icon for the pulseview.exe executable.
+	set(CMAKE_RC_COMPILE_OBJECT "${CMAKE_RC_COMPILER} -O coff -I${CMAKE_CURRENT_SOURCE_DIR} <SOURCE> <OBJECT>")
+	enable_language(RC)
+	list(APPEND pulseview_SOURCES pulseviewico.rc)
+endif()
+
 qt4_wrap_cpp(pulseview_HEADERS_MOC ${pulseview_HEADERS})
 qt4_wrap_ui(pulseview_FORMS_HEADERS ${pulseview_FORMS})
 qt4_add_resources(pulseview_RESOURCES_RCC ${pulseview_RESOURCES})
@@ -275,6 +284,15 @@ else()
 	list(APPEND PULSEVIEW_LINK_LIBS ${PKGDEPS_LIBRARIES})
 endif()
 
+if(WIN32)
+	# On Windows we need to statically link the libqsvg imageformat
+	# plugin (and the QtSvg component) for SVG graphics/icons to work.
+	add_definitions(-DQT_STATICPLUGIN)
+	link_directories("${QT_PLUGINS_DIR}/imageformats")
+	list(APPEND PULSEVIEW_LINK_LIBS ${QT_QTSVG_LIBRARY})
+	list(APPEND PULSEVIEW_LINK_LIBS "-lqsvg")
+endif()
+
 add_executable(${PROJECT_NAME}
 	${pulseview_SOURCES}
 	${pulseview_HEADERS_MOC}
@@ -283,11 +301,15 @@ add_executable(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} ${PULSEVIEW_LINK_LIBS})
-cotire(${PROJECT_NAME})
 
 if(WIN32)
-# Pass -mwindows so that no "DOS box" will open when PulseView is started.
-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-mwindows")
+	# Pass -mwindows so that no "DOS box" opens when PulseView is started.
+	set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-mwindows")
+endif()
+
+if(ENABLE_COTIRE)
+	include(cotire)
+	cotire(${PROJECT_NAME})
 endif()
 
 #===============================================================================
@@ -324,4 +346,4 @@ if(ENABLE_TESTS)
 	add_subdirectory(test)
 	enable_testing()
 	add_test(test ${CMAKE_CURRENT_BINARY_DIR}/test/pulseview-test)
-endif(ENABLE_TESTS)
+endif()

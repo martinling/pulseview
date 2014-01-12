@@ -31,7 +31,6 @@
 #include <QToolButton>
 
 #include <pv/sigsession.h>
-#include <pv/popups/probes.h>
 #include <pv/widgets/popuptoolbutton.h>
 #include <pv/widgets/sweeptimingwidget.h>
 
@@ -84,9 +83,9 @@ private:
 	bool _updating_device_selector;
 
 	pv::widgets::PopupToolButton _configure_button;
+	QAction *_configure_button_action;
 
 	pv::widgets::PopupToolButton _probes_button;
-	pv::popups::Probes _probes_popup;
 
 	QComboBox _record_length_selector;
 

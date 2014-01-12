@@ -27,6 +27,8 @@
 #include <QLineEdit>
 #include <QWidget>
 
+#include <stdint.h>
+
 namespace pv {
 namespace widgets {
 

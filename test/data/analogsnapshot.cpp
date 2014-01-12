@@ -20,14 +20,11 @@
 
 #include <extdef.h>
 
-#define __STDC_LIMIT_MACROS
 #include <stdint.h>
 
 #include <boost/test/unit_test.hpp>
 
 #include "../../pv/data/analogsnapshot.h"
-
-using namespace std;
 
 using pv::data::AnalogSnapshot;
 

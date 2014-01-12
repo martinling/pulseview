@@ -27,9 +27,6 @@
 
 #include <pv/prop/property.h>
 
-using namespace boost;
-using namespace std;
-
 namespace pv {
 namespace popups {
 
@@ -42,6 +39,11 @@ DeviceOptions::DeviceOptions(sr_dev_inst *sdi, QWidget *parent) :
 	setLayout(&_layout);
 
 	_layout.addWidget(_binding.get_property_form(this, true));
+}
+
+pv::prop::binding::DeviceOptions& DeviceOptions::binding()
+{
+	return _binding;
 }
 
 } // namespace popups

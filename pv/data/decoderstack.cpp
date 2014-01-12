@@ -35,8 +35,13 @@
 #include <pv/data/decode/annotation.h>
 #include <pv/view/logicsignal.h>
 
-using namespace boost;
-using namespace std;
+using boost::lock_guard;
+using boost::mutex;
+using boost::shared_ptr;
+using std::deque;
+using std::min;
+using std::list;
+using std::vector;
 
 namespace pv {
 namespace data {
@@ -168,11 +173,12 @@ void DecoderStack::decode_proc(shared_ptr<data::Logic> data)
 	const shared_ptr<pv::data::LogicSnapshot> &snapshot =
 		snapshots.front();
 	const int64_t sample_count = snapshot->get_sample_count() - 1;
+	const unsigned int chunk_sample_count =
+		DecodeChunkLength / snapshot->unit_size();
 
 	// Create the session
 	srd_session_new(&session);
 	assert(session);
-
 
 	// Create the decoders
 	BOOST_FOREACH(const shared_ptr<decode::Decoder> &dec, _stack)
@@ -202,13 +208,14 @@ void DecoderStack::decode_proc(shared_ptr<data::Logic> data)
 	srd_session_start(session);
 
 	for (int64_t i = 0;
-		!this_thread::interruption_requested() && i < sample_count;
-		i += DecodeChunkLength)
+		!boost::this_thread::interruption_requested() &&
+			i < sample_count;
+		i += chunk_sample_count)
 	{
 		lock_guard<mutex> decode_lock(_global_decode_mutex);
 
 		const int64_t chunk_end = min(
-			i + DecodeChunkLength, sample_count);
+			i + chunk_sample_count, sample_count);
 		snapshot->get_samples(chunk, i, chunk_end);
 
 		if (srd_session_send(session, i, i + sample_count,

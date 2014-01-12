@@ -1,7 +1,7 @@
 /*
  * This file is part of the PulseView project.
  *
- * Copyright (C) 2012 Joel Holdsworth <joel@airwebreathe.org.uk>
+ * Copyright (C) 2012-14 Joel Holdsworth <joel@airwebreathe.org.uk>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include <boost/thread.hpp>
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -46,6 +47,7 @@ class Analog;
 class AnalogSnapshot;
 class Logic;
 class LogicSnapshot;
+class SignalData;
 }
 
 namespace view {
@@ -89,10 +91,10 @@ public:
 
 	void stop_capture();
 
+	std::set< boost::shared_ptr<data::SignalData> > get_data() const;
+
 	std::vector< boost::shared_ptr<view::Signal> >
 		get_signals() const;
-
-	boost::shared_ptr<data::Logic> get_data();
 
 #ifdef ENABLE_DECODE
 	bool add_decoder(srd_decoder *const dec);

@@ -1,7 +1,7 @@
 /*
  * This file is part of the PulseView project.
  *
- * Copyright (C) 2012 Joel Holdsworth <joel@airwebreathe.org.uk>
+ * Copyright (C) 2014 Joel Holdsworth <joel@airwebreathe.org.uk>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,47 +18,48 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#include <boost/foreach.hpp>
+#ifndef PULSEVIEW_PV_DIALOGS_SAVEPROGRESS_H
+#define PULSEVIEW_PV_DIALOGS_SAVEPROGRESS_H
 
-#include "analog.h"
-#include "analogsnapshot.h"
+#include <set>
 
-using boost::shared_ptr;
-using std::deque;
-using std::max;
+#include <boost/shared_ptr.hpp>
+
+#include <QProgressDialog>
+
+#include <pv/storesession.h>
 
 namespace pv {
-namespace data {
 
-Analog::Analog() :
-	SignalData()
+class SigSession;
+
+namespace dialogs {
+
+class StoreProgress : public QProgressDialog
 {
-}
+	Q_OBJECT
 
-void Analog::push_snapshot(shared_ptr<AnalogSnapshot> &snapshot)
-{
-	_snapshots.push_front(snapshot);
-}
+public:
+	StoreProgress(const QString &file_name, const SigSession &session,
+		QWidget *parent = 0);
 
-deque< shared_ptr<AnalogSnapshot> >& Analog::get_snapshots()
-{
-	return _snapshots;
-}
+	virtual ~StoreProgress();
 
-void Analog::clear()
-{
-	_snapshots.clear();
-}
+	void run();
 
-uint64_t Analog::get_max_sample_count() const
-{
-	uint64_t l = 0;
-	BOOST_FOREACH(const boost::shared_ptr<AnalogSnapshot> s, _snapshots) {
-		assert(s);
-		l = max(l, s->get_sample_count());
-	}
-	return l;
-}
+private:
+	void show_error();
 
-} // namespace data
-} // namespace pv
+	void closeEvent(QCloseEvent*);
+
+private slots:
+	void on_progress_updated();
+
+private:
+	pv::StoreSession _session;
+};
+
+} // dialogs
+} // pv
+
+#endif // PULSEVIEW_PV_DIALOGS_SAVEPROGRESS_H
