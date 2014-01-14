@@ -208,7 +208,7 @@ void SamplingBar::update_sample_count_selector()
 	assert(sdi);
 
 	if (sr_config_get(sdi->driver, sdi, NULL,
-		SR_CONF_SAMPLERATE, &gvar) != SR_OK)
+		SR_CONF_LIMIT_SAMPLES, &gvar) != SR_OK)
 	{
 		_sample_count.show_none();
 	}
