@@ -51,7 +51,7 @@ private:
 	void mouseDoubleClickEvent(QMouseEvent * event);
 	void wheelEvent(QWheelEvent *event);
 
-private slots:
+private Q_SLOTS:
 	void on_signals_changed();
 	void on_signals_moved();
 

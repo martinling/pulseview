@@ -75,7 +75,7 @@ public:
 
 	void delete_pressed();
 
-private slots:
+private Q_SLOTS:
 	void on_disable();
 
 protected:
