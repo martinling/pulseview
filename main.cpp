@@ -23,7 +23,7 @@
 #endif
 
 #include <stdint.h>
-#include <libsigrok/libsigrok.h>
+#include <libsigrok/libsigrok.hpp>
 
 #include <getopt.h>
 
@@ -61,7 +61,7 @@ void usage()
 int main(int argc, char *argv[])
 {
 	int ret = 0;
-	struct sr_context *sr_ctx = NULL;
+	std::shared_ptr<sigrok::Context> context;
 	const char *open_file = NULL;
 
 	QApplication a(argc, argv);
@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
 		case 'l':
 		{
 			const int loglevel = atoi(optarg);
-			sr_log_loglevel_set(loglevel);
+			context->set_log_level(sigrok::LogLevel::get(loglevel));
 
 #ifdef ENABLE_DECODE
 			srd_log_loglevel_set(loglevel);
@@ -117,10 +117,7 @@ int main(int argc, char *argv[])
 		open_file = argv[argc - 1];
 
 	// Initialise libsigrok
-	if (sr_init(&sr_ctx) != SR_OK) {
-		qDebug() << "ERROR: libsigrok init failed.";
-		return 1;
-	}
+	context = sigrok::Context::create();
 
 	do {
 
@@ -137,7 +134,7 @@ int main(int argc, char *argv[])
 
 		try {
 			// Create the device manager, initialise the drivers
-			pv::DeviceManager device_manager(sr_ctx);
+			pv::DeviceManager device_manager(context);
 
 			// Initialise the main window
 			pv::MainWindow w(device_manager, open_file);
@@ -172,10 +169,6 @@ int main(int argc, char *argv[])
 #endif
 
 	} while (0);
-
-	// Destroy libsigrok
-	if (sr_ctx)
-		sr_exit(sr_ctx);
 
 	return ret;
 }

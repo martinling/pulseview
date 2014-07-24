@@ -30,7 +30,7 @@ using std::recursive_mutex;
 namespace pv {
 namespace data {
 
-Snapshot::Snapshot(int unit_size) :
+Snapshot::Snapshot(unsigned int unit_size) :
 	_data(NULL),
 	_sample_count(0),
 	_capacity(0),
@@ -52,7 +52,7 @@ uint64_t Snapshot::get_sample_count() const
 	return _sample_count;
 }
 
-int Snapshot::unit_size() const
+unsigned int Snapshot::unit_size() const
 {
 	return _unit_size;
 }

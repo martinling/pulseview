@@ -20,12 +20,11 @@
 
 #include <cassert>
 
-#include <libsigrok/libsigrok.h>
+#include <libsigrok/libsigrok.hpp>
 
 #include "connect.h"
 
 #include "pv/devicemanager.h"
-#include "pv/device/device.h"
 
 extern "C" {
 /* __STDC_FORMAT_MACROS is required for PRIu64 and friends (in C++). */
@@ -35,8 +34,15 @@ extern "C" {
 }
 
 using std::list;
+using std::map;
 using std::shared_ptr;
 using std::string;
+
+using sigrok::Driver;
+using sigrok::HardwareDevice;
+using sigrok::ConfigKey;
+using Glib::VariantBase;
+using Glib::Variant;
 
 extern sr_context *sr_ctx;
 
@@ -82,20 +88,13 @@ Connect::Connect(QWidget *parent, pv::DeviceManager &device_manager) :
 	_layout.addWidget(&_button_box);
 }
 
-shared_ptr<device::Device> Connect::get_selected_device() const
+shared_ptr<HardwareDevice> Connect::get_selected_device() const
 {
 	const QListWidgetItem *const item = _device_list.currentItem();
 	if (!item)
-		return shared_ptr<device::Device>();
+		return shared_ptr<HardwareDevice>();
 
-	const sr_dev_inst *const sdi = (sr_dev_inst*)item->data(
-		Qt::UserRole).value<void*>();
-	assert(sdi);
-
-	const auto iter = _device_map.find(sdi);
-	assert(iter != _device_map.end());
-
-	return (*iter).second;
+	return item->data(Qt::UserRole).value<shared_ptr<HardwareDevice>>();
 }
 
 void Connect::populate_drivers()
@@ -135,7 +134,6 @@ void Connect::populate_drivers()
 void Connect::unset_connection()
 {
 	_device_list.clear();
-	_device_map.clear();
 	_serial_device.hide();
 	_form_layout.labelForField(&_serial_device)->hide();
 	_button_box.button(QDialogButtonBox::Ok)->setDisabled(true);
@@ -150,49 +148,34 @@ void Connect::set_serial_connection()
 void Connect::scan_pressed()
 {
 	_device_list.clear();
-	_device_map.clear();
 
 	const int index = _drivers.currentIndex();
 	if (index == -1)
 		return;
 
-	sr_dev_driver *const driver = (sr_dev_driver*)_drivers.itemData(
-		index).value<void*>();
+	shared_ptr<Driver> driver =
+		_drivers.itemData(index).value<shared_ptr<Driver>>();
 
-	GSList *drvopts = NULL;
+	map<const ConfigKey *, VariantBase> drvopts;
 
-	if (_serial_device.isVisible()) {
-		sr_config *const src = (sr_config*)g_try_malloc(sizeof(sr_config));
-		src->key = SR_CONF_CONN;
-		const QByteArray byteArray = _serial_device.text().toUtf8();
-		src->data = g_variant_new_string((const gchar*)byteArray.constData());
-		drvopts = g_slist_append(drvopts, src);
-	}
+	if (_serial_device.isVisible())
+		drvopts[ConfigKey::CONN] = Variant<string>::create(
+			_serial_device.text().toUtf8().constData());
 
-	const list< shared_ptr<device::Device> > devices =
+	list< shared_ptr<HardwareDevice> > devices =
 		_device_manager.driver_scan(driver, drvopts);
 
-	g_slist_free_full(drvopts, (GDestroyNotify)free_drvopts);
-
-	for (shared_ptr<device::Device> dev_inst : devices)
+	for (shared_ptr<HardwareDevice> device : devices)
 	{
-		assert(dev_inst);
-		const sr_dev_inst *const sdi = dev_inst->dev_inst();
-		assert(sdi);
+		assert(device);
 
-		const string title = dev_inst->format_device_title();
-		QString text = QString::fromUtf8(title.c_str());
-
-		if (sdi->channels) {
-			text += QString(" with %1 channels").arg(
-				g_slist_length(sdi->channels));
-		}
+		QString text = QString::fromStdString(device->get_description());
+		text += QString(" with %1 channels").arg(device->get_channels().size());
 
 		QListWidgetItem *const item = new QListWidgetItem(text,
 			&_device_list);
-		item->setData(Qt::UserRole, qVariantFromValue((void*)sdi));
+		item->setData(Qt::UserRole, qVariantFromValue(device));
 		_device_list.addItem(item);
-		_device_map[sdi] = dev_inst;
 	}
 
 	_device_list.setCurrentRow(0);
@@ -228,12 +211,6 @@ void Connect::device_selected(int index)
 		}
 		g_variant_unref(gvar_list);
 	}
-}
-
-void Connect::free_drvopts(struct sr_config *src)
-{
-	g_variant_unref(src->data);
-	g_free(src);
 }
 
 } // namespace dialogs

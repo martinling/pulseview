@@ -32,7 +32,7 @@
 
 #include <pv/widgets/popup.h>
 
-struct sr_channel_group;
+#include <libsigrok/libsigrok.hpp>
 
 class QCheckBox;
 class QGridLayout;
@@ -63,7 +63,7 @@ public:
 private:
 	void set_all_probes(bool set);
 
-	void populate_group(const sr_channel_group *group,
+	void populate_group(std::shared_ptr<sigrok::ChannelGroup> group,
 		const std::vector< std::shared_ptr<pv::view::Signal> > sigs);
 
 	QGridLayout* create_channel_group_grid(

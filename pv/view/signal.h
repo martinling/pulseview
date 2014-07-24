@@ -30,16 +30,12 @@
 
 #include "trace.h"
 
-struct sr_channel;
+#include <libsigrok/libsigrok.hpp>
 
 namespace pv {
 
 namespace data {
 class SignalData;
-}
-
-namespace device {
-class DevInst;
 }
 
 namespace view {
@@ -49,8 +45,7 @@ class Signal : public Trace
 	Q_OBJECT
 
 protected:
-	Signal(std::shared_ptr<pv::device::DevInst> dev_inst,
-		const sr_channel *const probe);
+	Signal(std::shared_ptr<sigrok::Channel> channel);
 
 public:
 	/**
@@ -67,7 +62,7 @@ public:
 
 	void enable(bool enable = true);
 
-	const sr_channel* probe() const;
+	std::shared_ptr<sigrok::Channel> channel() const;
 
 	virtual void populate_popup_form(QWidget *parent, QFormLayout *form);
 
@@ -79,8 +74,7 @@ private Q_SLOTS:
 	void on_disable();
 
 protected:
-	std::shared_ptr<pv::device::DevInst> _dev_inst;
-	const sr_channel *const _probe;
+	std::shared_ptr<sigrok::Channel> _channel;
 
 	QComboBox *_name_widget;
 	bool _updating_name_widget;

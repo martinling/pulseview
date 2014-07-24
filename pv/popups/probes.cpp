@@ -27,7 +27,6 @@
 
 #include "probes.h"
 
-#include <pv/device/devinst.h>
 #include <pv/prop/binding/deviceoptions.h>
 #include <pv/sigsession.h>
 #include <pv/view/signal.h>
@@ -38,6 +37,10 @@ using std::map;
 using std::set;
 using std::shared_ptr;
 using std::vector;
+
+using sigrok::Device;
+using sigrok::Channel;
+using sigrok::ChannelGroup;
 
 using pv::view::Signal;
 
@@ -55,33 +58,25 @@ Probes::Probes(SigSession &session, QWidget *parent) :
 	// Create the layout
 	setLayout(&_layout);
 
-	shared_ptr<device::DevInst> dev_inst = _session.get_device();
-	assert(dev_inst);
-	const sr_dev_inst *const sdi = dev_inst->dev_inst();
-	assert(sdi);
+	shared_ptr<sigrok::Device> device = _session.get_device();
+	assert(device);
 
 	// Collect a set of signals
-	map<const sr_channel*, shared_ptr<Signal> > signal_map;
+	map<shared_ptr<Channel>, shared_ptr<Signal> > signal_map;
 	const vector< shared_ptr<Signal> > sigs = _session.get_signals();
 	for (const shared_ptr<Signal> &sig : sigs)
-		signal_map[sig->probe()] = sig;
+		signal_map[sig->channel()] = sig;
 
 	// Populate channel groups
-	for (const GSList *g = sdi->channel_groups; g; g = g->next)
+	for (auto entry : device->get_channel_groups())
 	{
-		const sr_channel_group *const group =
-			(const sr_channel_group*)g->data;
-		assert(group);
-
+		shared_ptr<ChannelGroup> group = entry.second;
 		// Make a set of signals, and removed this signals from the
 		// signal map.
 		vector< shared_ptr<Signal> > group_sigs;
-		for (const GSList *p = group->channels; p; p = p->next)
+		for (auto channel : group->get_channels())
 		{
-			const sr_channel *const probe = (const sr_channel*)p->data;
-			assert(probe);
-
-			const auto iter = signal_map.find(probe);
+			const auto iter = signal_map.find(channel);
 			assert(iter != signal_map.end());
 
 			group_sigs.push_back((*iter).second);
@@ -93,13 +88,10 @@ Probes::Probes(SigSession &session, QWidget *parent) :
 
 	// Make a vector of the remaining probes
 	vector< shared_ptr<Signal> > global_sigs;
-	for (const GSList *p = sdi->channels; p; p = p->next)
+	for (auto channel : device->get_channels())
 	{
-		const sr_channel *const probe = (const sr_channel*)p->data;
-		assert(probe);
-
-		const map<const sr_channel*, shared_ptr<Signal> >::
-			const_iterator iter = signal_map.find(probe);
+		const map<shared_ptr<Channel>, shared_ptr<Signal> >::
+			const_iterator iter = signal_map.find(channel);
 		if (iter != signal_map.end())
 			global_sigs.push_back((*iter).second);
 	}
@@ -145,7 +137,7 @@ void Probes::set_all_probes(bool set)
 	_updating_probes = false;
 }
 
-void Probes::populate_group(const sr_channel_group *group,
+void Probes::populate_group(shared_ptr<ChannelGroup> group,
 	const vector< shared_ptr<pv::view::Signal> > sigs)
 {
 	using pv::prop::binding::DeviceOptions;
@@ -155,14 +147,13 @@ void Probes::populate_group(const sr_channel_group *group,
 	// popup.
 	shared_ptr<DeviceOptions> binding;
 	if (group)
-		binding = shared_ptr<DeviceOptions>(new DeviceOptions(
-			_session.get_device(), group));
+		binding = shared_ptr<DeviceOptions>(new DeviceOptions(group));
 
 	// Create a title if the group is going to have any content
 	if ((!sigs.empty() || (binding && !binding->properties().empty())) &&
-		group && group->name)
+		group)
 		_layout.addRow(new QLabel(
-			QString("<h3>%1</h3>").arg(group->name)));
+			QString("<h3>%1</h3>").arg(group->get_name().c_str())));
 
 	// Create the channel group grid
 	QGridLayout *const probe_grid =

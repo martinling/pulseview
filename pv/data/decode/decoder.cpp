@@ -139,7 +139,7 @@ srd_decoder_inst* Decoder::create_decoder_inst(srd_session *session, int unit_si
 	{
 		shared_ptr<view::LogicSignal> signal((*i).second);
 		GVariant *const gvar = g_variant_new_int32(
-			signal->probe()->index);
+			signal->channel()->get_index());
 		g_variant_ref_sink(gvar);
 		g_hash_table_insert(probes, (*i).first->id, gvar);
 	}

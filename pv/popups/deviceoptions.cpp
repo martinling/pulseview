@@ -27,15 +27,16 @@
 
 using std::shared_ptr;
 
+using sigrok::Device;
+
 namespace pv {
 namespace popups {
 
-DeviceOptions::DeviceOptions(shared_ptr<device::DevInst> dev_inst,
-	QWidget *parent) :
+DeviceOptions::DeviceOptions(shared_ptr<Device> device, QWidget *parent) :
 	Popup(parent),
-	_dev_inst(dev_inst),
+	_device(device),
 	_layout(this),
-	_binding(dev_inst)
+	_binding(device)
 {
 	setLayout(&_layout);
 

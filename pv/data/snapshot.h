@@ -21,7 +21,7 @@
 #ifndef PULSEVIEW_PV_DATA_SNAPSHOT_H
 #define PULSEVIEW_PV_DATA_SNAPSHOT_H
 
-#include <libsigrok/libsigrok.h>
+#include <libsigrok/libsigrok.hpp>
 
 #include <thread>
 #include <mutex>
@@ -32,13 +32,13 @@ namespace data {
 class Snapshot
 {
 public:
-	Snapshot(int unit_size);
+	Snapshot(unsigned int unit_size);
 
 	virtual ~Snapshot();
 
 	uint64_t get_sample_count() const;
 
-	int unit_size() const;
+	unsigned int unit_size() const;
 
 	/**
 	 * @brief Increase the capacity of the snapshot.
@@ -75,7 +75,7 @@ protected:
 	void *_data;
 	uint64_t _sample_count;
 	uint64_t _capacity;
-	int _unit_size;
+	unsigned int _unit_size;
 };
 
 } // namespace data

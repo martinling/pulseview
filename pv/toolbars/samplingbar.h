@@ -32,19 +32,19 @@
 #include <QToolBar>
 #include <QToolButton>
 
+#include <libsigrok/libsigrok.hpp>
+
 #include <pv/sigsession.h>
 #include <pv/widgets/popuptoolbutton.h>
 #include <pv/widgets/sweeptimingwidget.h>
+
+Q_DECLARE_METATYPE(std::shared_ptr<sigrok::Device>)
 
 class QAction;
 
 namespace pv {
 
 class SigSession;
-
-namespace device {
-class DevInst;
-}
 
 namespace toolbars {
 
@@ -61,11 +61,11 @@ public:
 	SamplingBar(SigSession &session, QWidget *parent);
 
 	void set_device_list(
-		const std::list< std::shared_ptr<pv::device::DevInst> >
+		const std::list< std::shared_ptr<sigrok::Device> >
 			&devices,
-		std::shared_ptr<pv::device::DevInst> selected);
+		std::shared_ptr<sigrok::Device> selected);
 
-	std::shared_ptr<pv::device::DevInst> get_selected_device() const;
+	std::shared_ptr<sigrok::Device> get_selected_device() const;
 
 	void set_capture_state(pv::SigSession::capture_state state);
 
@@ -95,8 +95,6 @@ private:
 	SigSession &_session;
 
 	QComboBox _device_selector;
-	std::map<const sr_dev_inst*, std::weak_ptr<device::DevInst> >
-		_device_selector_map;
 	bool _updating_device_selector;
 
 	pv::widgets::PopupToolButton _configure_button;

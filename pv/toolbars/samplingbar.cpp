@@ -30,16 +30,20 @@
 #include "samplingbar.h"
 
 #include <pv/devicemanager.h>
-#include <pv/device/devinst.h>
 #include <pv/popups/deviceoptions.h>
 #include <pv/popups/probes.h>
 #include <pv/util.h>
 
 using std::map;
+using std::vector;
 using std::max;
 using std::min;
 using std::shared_ptr;
 using std::string;
+
+using sigrok::Device;
+using sigrok::ConfigKey;
+using sigrok::Error;
 
 namespace pv {
 namespace toolbars {
@@ -100,8 +104,8 @@ SamplingBar::SamplingBar(SigSession &session, QWidget *parent) :
 }
 
 void SamplingBar::set_device_list(
-	const std::list< shared_ptr<pv::device::DevInst> > &devices,
-	shared_ptr<pv::device::DevInst> selected)
+	const std::list< shared_ptr<Device> > &devices,
+	shared_ptr<Device> selected)
 {
 	int selected_index = -1;
 
@@ -110,20 +114,15 @@ void SamplingBar::set_device_list(
 	_updating_device_selector = true;
 
 	_device_selector.clear();
-	_device_selector_map.clear();
 
-	for (shared_ptr<pv::device::DevInst> dev_inst : devices) {
-		assert(dev_inst);
-		const string title = dev_inst->format_device_title();
-		const sr_dev_inst *sdi = dev_inst->dev_inst();
-		assert(sdi);
+	for (shared_ptr<Device> device : devices) {
+		assert(device);
 
-		if (selected == dev_inst)
+		if (selected == device)
 			selected_index = _device_selector.count();
 
-		_device_selector_map[sdi] = dev_inst;
-		_device_selector.addItem(title.c_str(),
-			qVariantFromValue((void*)sdi));
+		_device_selector.addItem(device->get_description().c_str(),
+			qVariantFromValue(device));
 	}
 
 	// The selected device should have been in the list
@@ -135,22 +134,13 @@ void SamplingBar::set_device_list(
 	_updating_device_selector = false;
 }
 
-shared_ptr<pv::device::DevInst> SamplingBar::get_selected_device() const
+shared_ptr<Device> SamplingBar::get_selected_device() const
 {
 	const int index = _device_selector.currentIndex();
 	if (index < 0)
-		return shared_ptr<pv::device::DevInst>();
+		return shared_ptr<Device>();
 
-	const sr_dev_inst *const sdi =
-		(const sr_dev_inst*)_device_selector.itemData(
-			index).value<void*>();
-	assert(sdi);
-
-	const auto iter = _device_selector_map.find(sdi);
-	if (iter == _device_selector_map.end())
-		return shared_ptr<pv::device::DevInst>();
-
-	return shared_ptr<pv::device::DevInst>((*iter).second);
+	return _device_selector.itemData(index).value<shared_ptr<Device>>();
 }
 
 void SamplingBar::set_capture_state(pv::SigSession::capture_state state)
@@ -163,28 +153,30 @@ void SamplingBar::set_capture_state(pv::SigSession::capture_state state)
 
 void SamplingBar::update_sample_rate_selector()
 {
-	GVariant *gvar_dict, *gvar_list;
+	Glib::VariantContainerBase gvar_dict;
+	GVariant *gvar_list;
 	const uint64_t *elements = NULL;
 	gsize num_elements;
 
 	if (_updating_sample_rate)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
 	assert(!_updating_sample_rate);
 	_updating_sample_rate = true;
 
-	if (!(gvar_dict = dev_inst->list_config(NULL, SR_CONF_SAMPLERATE)))
-	{
+	try {
+		gvar_dict = device->config_list(ConfigKey::SAMPLERATE);
+	} catch (Error error) {
 		_sample_rate.show_none();
 		_updating_sample_rate = false;
 		return;
 	}
 
-	if ((gvar_list = g_variant_lookup_value(gvar_dict,
+	if ((gvar_list = g_variant_lookup_value(gvar_dict.gobj(),
 			"samplerate-steps", G_VARIANT_TYPE("at"))))
 	{
 		elements = (const uint64_t *)g_variant_get_fixed_array(
@@ -212,7 +204,7 @@ void SamplingBar::update_sample_rate_selector()
 			_sample_rate.show_min_max_step(min, max, step);
 		}
 	}
-	else if ((gvar_list = g_variant_lookup_value(gvar_dict,
+	else if ((gvar_list = g_variant_lookup_value(gvar_dict.gobj(),
 			"samplerates", G_VARIANT_TYPE("at"))))
 	{
 		elements = (const uint64_t *)g_variant_get_fixed_array(
@@ -222,28 +214,30 @@ void SamplingBar::update_sample_rate_selector()
 	}
 	_updating_sample_rate = false;
 
-	g_variant_unref(gvar_dict);
 	update_sample_rate_selector_value();
 }
 
 void SamplingBar::update_sample_rate_selector_value()
 {
-	GVariant *gvar;
+	Glib::VariantBase gvar;
 	uint64_t samplerate;
 
 	if (_updating_sample_rate)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
-	if (!(gvar = dev_inst->get_config(NULL, SR_CONF_SAMPLERATE))) {
+	try {
+		gvar = device->config_get(ConfigKey::SAMPLERATE);
+	} catch (Error error) {
 		qDebug() << "WARNING: Failed to get value of sample rate";
 		return;
 	}
-	samplerate = g_variant_get_uint64(gvar);
-	g_variant_unref(gvar);
+
+	samplerate =
+		Glib::VariantBase::cast_dynamic<Glib::Variant<uint64_t>>(gvar).get();
 
 	assert(!_updating_sample_rate);
 	_updating_sample_rate = true;
@@ -253,13 +247,13 @@ void SamplingBar::update_sample_rate_selector_value()
 
 void SamplingBar::update_sample_count_selector()
 {
-	GVariant *gvar;
+	Glib::VariantBase gvar;
 
 	if (_updating_sample_count)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
 	assert(!_updating_sample_count);
@@ -274,12 +268,11 @@ void SamplingBar::update_sample_count_selector()
 		if (sample_count == 0)
 			sample_count = DefaultSampleCount;
 
-		if ((gvar = dev_inst->list_config(NULL, SR_CONF_LIMIT_SAMPLES)))
-		{
-			g_variant_get(gvar, "(tt)",
+		try {
+			gvar = device->config_list(ConfigKey::LIMIT_SAMPLES);
+			g_variant_get(gvar.gobj(), "(tt)",
 				&min_sample_count, &max_sample_count);
-			g_variant_unref(gvar);
-		}
+		} catch (Error error) {}
 
 		min_sample_count = min(max(min_sample_count, MinSampleCount),
 			max_sample_count);
@@ -287,16 +280,14 @@ void SamplingBar::update_sample_count_selector()
 		_sample_count.show_125_list(
 			min_sample_count, max_sample_count);
 
-		if ((gvar = dev_inst->get_config(NULL, SR_CONF_LIMIT_SAMPLES)))
-		{
-			sample_count = g_variant_get_uint64(gvar);
+		try {
+			gvar = device->config_get(ConfigKey::LIMIT_SAMPLES);
+			sample_count = g_variant_get_uint64(gvar.gobj());
 			if (sample_count == 0)
 				sample_count = DefaultSampleCount;
 			sample_count = min(max(sample_count, MinSampleCount),
 				max_sample_count);
-
-			g_variant_unref(gvar);
-		}
+		} catch (Error error) {}
 
 		_sample_count.set_value(sample_count);
 	}
@@ -308,16 +299,16 @@ void SamplingBar::update_sample_count_selector()
 
 void SamplingBar::update_device_config_widgets()
 {
-	GVariant *gvar;
+	Glib::VariantBase gvar;
 
 	using namespace pv::popups;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
 	// Update the configure popup
-	DeviceOptions *const opts = new DeviceOptions(dev_inst, this);
+	DeviceOptions *const opts = new DeviceOptions(device, this);
 	_configure_button_action->setVisible(
 		!opts->binding().properties().empty());
 	_configure_button.set_popup(opts);
@@ -329,30 +320,31 @@ void SamplingBar::update_device_config_widgets()
 	// Update supported options.
 	_sample_count_supported = false;
 
-	if ((gvar = dev_inst->list_config(NULL, SR_CONF_DEVICE_OPTIONS)))
-	{
-		gsize num_opts;
-		const int *const options =
-			(const int32_t *)g_variant_get_fixed_array(
-			        gvar, &num_opts, sizeof(int32_t));
-		for (unsigned int i = 0; i < num_opts; i++)
+	try {
+		gvar = device->config_list(ConfigKey::DEVICE_OPTIONS);
+
+		vector<int32_t> options =
+			Glib::VariantBase::cast_dynamic<Glib::Variant<vector<int32_t>>>(
+				gvar).get();
+
+		for (int32_t option : options)
 		{
-			switch (options[i]) {
+			switch (option) {
 			case SR_CONF_LIMIT_SAMPLES:
 				_sample_count_supported = true;
 				break;
 			case SR_CONF_LIMIT_FRAMES:
-				dev_inst->set_config(NULL, SR_CONF_LIMIT_FRAMES,
-					g_variant_new_uint64(1));
+				device->config_set(ConfigKey::LIMIT_FRAMES,
+					Glib::Variant<uint64_t>::create(1));
 				break;
 			}
 		}
-	}
+	} catch (Error error) {}
 
 	// Add notification of reconfigure events
 	disconnect(this, SLOT(on_config_changed()));
-	connect(dev_inst.get(), SIGNAL(config_changed()),
-		this, SLOT(on_config_changed()));
+	// connect(device, SIGNAL(config_changed()),
+	//	this, SLOT(on_config_changed()));
 
 	// Update sweep timing widgets.
 	update_sample_count_selector();
@@ -366,8 +358,8 @@ void SamplingBar::commit_sample_count()
 	if (_updating_sample_count)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
 	sample_count = _sample_count.value();
@@ -375,11 +367,15 @@ void SamplingBar::commit_sample_count()
 	// Set the sample count
 	assert(!_updating_sample_count);
 	_updating_sample_count = true;
-	if (_sample_count_supported &&
-		!dev_inst->set_config(NULL, SR_CONF_LIMIT_SAMPLES,
-		g_variant_new_uint64(sample_count))) {
-		qDebug() << "Failed to configure sample count.";
-		return;
+	if (_sample_count_supported)
+	{
+		try {
+			device->config_set(ConfigKey::LIMIT_SAMPLES,
+				Glib::Variant<uint64_t>::create(sample_count));
+		} catch (Error error) {
+			qDebug() << "Failed to configure sample count.";
+			return;
+		}
 	}
 	_updating_sample_count = false;
 }
@@ -391,8 +387,8 @@ void SamplingBar::commit_sample_rate()
 	if (_updating_sample_rate)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	const shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
 	sample_rate = _sample_rate.value();
@@ -402,8 +398,10 @@ void SamplingBar::commit_sample_rate()
 	// Set the samplerate
 	assert(!_updating_sample_rate);
 	_updating_sample_rate = true;
-	if (!dev_inst->set_config(NULL, SR_CONF_SAMPLERATE,
-		g_variant_new_uint64(sample_rate))) {
+	try {
+		device->config_set(ConfigKey::SAMPLERATE,
+			Glib::Variant<uint64_t>::create(sample_rate));
+	} catch (Error error) {
 		qDebug() << "Failed to configure samplerate.";
 		return;
 	}
@@ -415,11 +413,11 @@ void SamplingBar::on_device_selected()
 	if (_updating_device_selector)
 		return;
 
-	const shared_ptr<device::DevInst> dev_inst = get_selected_device();
-	if (!dev_inst)
+	shared_ptr<Device> device = get_selected_device();
+	if (!device)
 		return;
 
-	_session.set_device(dev_inst);
+	_session.set_device(device);
 
 	update_device_config_widgets();
 }

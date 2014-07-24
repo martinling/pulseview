@@ -32,9 +32,9 @@
 #include "signal.h"
 #include "view.h"
 
-#include <pv/device/devinst.h>
-
 using std::shared_ptr;
+
+using sigrok::Channel;
 
 namespace pv {
 namespace view {
@@ -56,15 +56,13 @@ const char *const ProbeNames[] = {
 	"SCL"
 };
 
-Signal::Signal(shared_ptr<pv::device::DevInst> dev_inst,
-	const sr_channel *const probe) :
-	Trace(probe->name),
-	_dev_inst(dev_inst),
-	_probe(probe),
+Signal::Signal(shared_ptr<Channel> channel) :
+	Trace(channel->get_name().c_str()),
+	_channel(channel),
 	_name_widget(NULL),
 	_updating_name_widget(false)
 {
-	assert(_probe);
+	assert(_channel);
 }
 
 void Signal::set_name(QString name)
@@ -77,18 +75,18 @@ void Signal::set_name(QString name)
 
 bool Signal::enabled() const
 {
-	return _probe->enabled;
+	return _channel->get_enabled();
 }
 
 void Signal::enable(bool enable)
 {
-	_dev_inst->enable_probe(_probe, enable);
+	_channel->set_enabled(enable);
 	visibility_changed();
 }
 
-const sr_channel* Signal::probe() const
+shared_ptr<Channel> Signal::channel() const
 {
-	return _probe;
+	return _channel;
 }
 
 void Signal::populate_popup_form(QWidget *parent, QFormLayout *form)
@@ -98,7 +96,7 @@ void Signal::populate_popup_form(QWidget *parent, QFormLayout *form)
 
 	for(unsigned int i = 0; i < countof(ProbeNames); i++)
 		_name_widget->insertItem(i, ProbeNames[i]);
-	_name_widget->setEditText(_probe->name);
+	_name_widget->setEditText(_channel->get_name().c_str());
 
 	connect(_name_widget, SIGNAL(editTextChanged(const QString&)),
 		this, SLOT(on_text_changed(const QString&)));
