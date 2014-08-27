@@ -42,7 +42,6 @@
 #include "mainwindow.h"
 
 #include "devicemanager.h"
-#include "device/device.h"
 #include "dialogs/about.h"
 #include "dialogs/connect.h"
 #include "dialogs/storeprogress.h"
@@ -59,10 +58,14 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <glib.h>
-#include <libsigrok/libsigrok.h>
+
+#include <libsigrok/libsigrok.hpp>
 
 using std::list;
 using std::shared_ptr;
+
+using sigrok::Device;
+using sigrok::HardwareDevice;
 
 namespace pv {
 
@@ -280,8 +283,8 @@ void MainWindow::update_device_list()
 {
 	assert(_sampling_bar);
 
-	shared_ptr<pv::device::DevInst> selected_device = _session.get_device();
-	list< shared_ptr<device::DevInst> > devices;
+	shared_ptr<Device> selected_device = _session.get_device();
+	list< shared_ptr<Device> > devices;
 
 	if (_device_manager.devices().size() == 0)
 		return;
@@ -425,7 +428,7 @@ void MainWindow::on_actionViewShowCursors_triggered()
 
 void MainWindow::on_actionAbout_triggered()
 {
-	dialogs::About dlg(this);
+	dialogs::About dlg(_device_manager.context(), this);
 	dlg.exec();
 }
 
