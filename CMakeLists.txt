@@ -144,7 +144,7 @@ set(pulseview_SOURCES
 	pv/dialogs/connect.cpp
 	pv/dialogs/storeprogress.cpp
 	pv/popups/deviceoptions.cpp
-	pv/popups/probes.cpp
+	pv/popups/channels.cpp
 	pv/prop/bool.cpp
 	pv/prop/double.cpp
 	pv/prop/enum.cpp
@@ -186,7 +186,7 @@ set(pulseview_HEADERS
 	pv/dialogs/about.h
 	pv/dialogs/connect.h
 	pv/dialogs/storeprogress.h
-	pv/popups/probes.h
+	pv/popups/channels.h
 	pv/popups/deviceoptions.h
 	pv/prop/bool.h
 	pv/prop/double.h

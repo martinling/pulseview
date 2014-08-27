@@ -175,12 +175,12 @@ void SigSession::start_capture(function<void (const QString)> error_handler)
 
 	assert(_dev_inst->dev_inst());
 
-	// Check that at least one probe is enabled
+	// Check that at least one channel is enabled
 	const GSList *l;
 	for (l = _dev_inst->dev_inst()->channels; l; l = l->next) {
-		sr_channel *const probe = (sr_channel*)l->data;
-		assert(probe);
-		if (probe->enabled)
+		sr_channel *const channel = (sr_channel*)l->data;
+		assert(channel);
+		if (channel->enabled)
 			break;
 	}
 
@@ -226,7 +226,7 @@ vector< shared_ptr<view::Signal> > SigSession::get_signals() const
 #ifdef ENABLE_DECODE
 bool SigSession::add_decoder(srd_decoder *const dec)
 {
-	map<const srd_channel*, shared_ptr<view::LogicSignal> > probes;
+	map<const srd_channel*, shared_ptr<view::LogicSignal> > channels;
 	shared_ptr<data::DecoderStack> decoder_stack;
 
 	try
@@ -237,15 +237,15 @@ bool SigSession::add_decoder(srd_decoder *const dec)
 		decoder_stack = shared_ptr<data::DecoderStack>(
 			new data::DecoderStack(*this, dec));
 
-		// Make a list of all the probes
-		std::vector<const srd_channel*> all_probes;
+		// Make a list of all the channels
+		std::vector<const srd_channel*> all_channels;
 		for(const GSList *i = dec->channels; i; i = i->next)
-			all_probes.push_back((const srd_channel*)i->data);
+			all_channels.push_back((const srd_channel*)i->data);
 		for(const GSList *i = dec->opt_channels; i; i = i->next)
-			all_probes.push_back((const srd_channel*)i->data);
+			all_channels.push_back((const srd_channel*)i->data);
 
-		// Auto select the initial probes
-		for (const srd_channel *pdch : all_probes)
+		// Auto select the initial channels
+		for (const srd_channel *pdch : all_channels)
 			for (shared_ptr<view::Signal> s : _signals)
 			{
 				shared_ptr<view::LogicSignal> l =
@@ -253,13 +253,13 @@ bool SigSession::add_decoder(srd_decoder *const dec)
 				if (l && QString::fromUtf8(pdch->name).
 					toLower().contains(
 					l->get_name().toLower()))
-					probes[pdch] = l;
+					channels[pdch] = l;
 			}
 
 		assert(decoder_stack);
 		assert(!decoder_stack->stack().empty());
 		assert(decoder_stack->stack().front());
-		decoder_stack->stack().front()->set_probes(probes);
+		decoder_stack->stack().front()->set_channels(channels);
 
 		// Create the decode signal
 		shared_ptr<view::DecodeTrace> d(
@@ -312,7 +312,7 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 	assert(dev_inst);
 	assert(_capture_state == Stopped);
 
-	unsigned int logic_probe_count = 0;
+	unsigned int logic_channel_count = 0;
 
 	// Clear the decode traces
 	_decode_traces.clear();
@@ -322,13 +322,13 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 		assert(dev_inst->dev_inst());
 		for (const GSList *l = dev_inst->dev_inst()->channels;
 			l; l = l->next) {
-			const sr_channel *const probe = (const sr_channel *)l->data;
-			if (!probe->enabled)
+			const sr_channel *const channel = (const sr_channel *)l->data;
+			if (!channel->enabled)
 				continue;
 
-			switch(probe->type) {
+			switch(channel->type) {
 			case SR_CHANNEL_LOGIC:
-				logic_probe_count++;
+				logic_channel_count++;
 				break;
 			}
 		}
@@ -339,9 +339,9 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 		lock_guard<mutex> data_lock(_data_mutex);
 
 		_logic_data.reset();
-		if (logic_probe_count != 0) {
+		if (logic_channel_count != 0) {
 			_logic_data.reset(new data::Logic(
-				logic_probe_count));
+				logic_channel_count));
 			assert(_logic_data);
 		}
 	}
@@ -359,14 +359,14 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 		for (const GSList *l = dev_inst->dev_inst()->channels;
 			l; l = l->next) {
 			shared_ptr<view::Signal> signal;
-			sr_channel *const probe = (sr_channel *)l->data;
-			assert(probe);
+			sr_channel *const channel = (sr_channel *)l->data;
+			assert(channel);
 
-			switch(probe->type) {
+			switch(channel->type) {
 			case SR_CHANNEL_LOGIC:
 				signal = shared_ptr<view::Signal>(
 					new view::LogicSignal(dev_inst,
-						probe, _logic_data));
+						channel, _logic_data));
 				break;
 
 			case SR_CHANNEL_ANALOG:
@@ -375,7 +375,7 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 					new data::Analog());
 				signal = shared_ptr<view::Signal>(
 					new view::AnalogSignal(dev_inst,
-						probe, data));
+						channel, data));
 				break;
 			}
 
@@ -393,13 +393,13 @@ void SigSession::update_signals(shared_ptr<device::DevInst> dev_inst)
 	signals_changed();
 }
 
-shared_ptr<view::Signal> SigSession::signal_from_probe(
-	const sr_channel *probe) const
+shared_ptr<view::Signal> SigSession::signal_from_channel(
+	const sr_channel *channel) const
 {
 	lock_guard<mutex> lock(_signals_mutex);
 	for (shared_ptr<view::Signal> sig : _signals) {
 		assert(sig);
-		if (sig->probe() == probe)
+		if (sig->channel() == channel)
 			return sig;
 	}
 	return shared_ptr<view::Signal>();
@@ -533,8 +533,8 @@ void SigSession::feed_in_analog(const sr_datafeed_analog &analog)
 {
 	lock_guard<mutex> lock(_data_mutex);
 
-	const unsigned int probe_count = g_slist_length(analog.channels);
-	const size_t sample_count = analog.num_samples / probe_count;
+	const unsigned int channel_count = g_slist_length(analog.channels);
+	const size_t sample_count = analog.num_samples / channel_count;
 	const float *data = analog.data;
 	bool sweep_beginning = false;
 
@@ -542,12 +542,12 @@ void SigSession::feed_in_analog(const sr_datafeed_analog &analog)
 	{
 		shared_ptr<data::AnalogSnapshot> snapshot;
 
-		sr_channel *const probe = (sr_channel*)p->data;
-		assert(probe);
+		sr_channel *const channel = (sr_channel*)p->data;
+		assert(channel);
 
-		// Try to get the snapshot of the probe
+		// Try to get the snapshot of the channel
 		const map< const sr_channel*, shared_ptr<data::AnalogSnapshot> >::
-			iterator iter = _cur_analog_snapshots.find(probe);
+			iterator iter = _cur_analog_snapshots.find(channel);
 		if (iter != _cur_analog_snapshots.end())
 			snapshot = (*iter).second;
 		else
@@ -557,15 +557,15 @@ void SigSession::feed_in_analog(const sr_datafeed_analog &analog)
 			// in the sweep containing this snapshot.
 			sweep_beginning = true;
 
-			// Create a snapshot, keep it in the maps of probes
+			// Create a snapshot, keep it in the maps of channels
 			snapshot = shared_ptr<data::AnalogSnapshot>(
 				new data::AnalogSnapshot(_dev_inst->get_sample_limit()));
-			_cur_analog_snapshots[probe] = snapshot;
+			_cur_analog_snapshots[channel] = snapshot;
 
-			// Find the annalog data associated with the probe
+			// Find the annalog data associated with the channel
 			shared_ptr<view::AnalogSignal> sig =
 				dynamic_pointer_cast<view::AnalogSignal>(
-					signal_from_probe(probe));
+					signal_from_channel(channel));
 			assert(sig);
 
 			shared_ptr<data::Analog> data(sig->analog_data());
@@ -579,7 +579,7 @@ void SigSession::feed_in_analog(const sr_datafeed_analog &analog)
 
 		// Append the samples in the snapshot
 		snapshot->append_interleaved_samples(data++, sample_count,
-			probe_count);
+			channel_count);
 	}
 
 	if (sweep_beginning) {
