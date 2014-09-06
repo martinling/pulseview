@@ -21,52 +21,49 @@
 #ifndef PULSEVIEW_PV_DEVICEMANAGER_H
 #define PULSEVIEW_PV_DEVICEMANAGER_H
 
-#include <glib.h>
-
 #include <list>
+#include <map>
 #include <memory>
 #include <string>
 
-struct sr_context;
-struct sr_dev_driver;
+namespace Glib {
+	class VariantBase;
+}
+
+namespace sigrok {
+	class ConfigKey;
+	class Context;
+	class Driver;
+	class HardwareDevice;
+}
 
 namespace pv {
 
 class SigSession;
 
-namespace device {
-class Device;
-}
-
 class DeviceManager
 {
 public:
-	DeviceManager(struct sr_context *sr_ctx);
+	DeviceManager(std::shared_ptr<sigrok::Context> context);
 
 	~DeviceManager();
 
-	const std::list< std::shared_ptr<pv::device::Device> >&
+	std::shared_ptr<sigrok::Context> context();
+
+	const std::list< std::shared_ptr<sigrok::HardwareDevice> >&
 		devices() const;
 
-	std::list< std::shared_ptr<pv::device::Device> > driver_scan(
-		struct sr_dev_driver *const driver,
-		GSList *const drvopts = NULL);
+	std::list< std::shared_ptr<sigrok::HardwareDevice> > driver_scan(
+		std::shared_ptr<sigrok::Driver> driver,
+		std::map<const sigrok::ConfigKey *, Glib::VariantBase> drvopts);
 
 private:
-	void init_drivers();
+	static bool compare_devices(std::shared_ptr<sigrok::HardwareDevice> a,
+		std::shared_ptr<sigrok::HardwareDevice> b);
 
-	void release_devices();
-
-	void scan_all_drivers();
-
-	void release_driver(struct sr_dev_driver *const driver);
-
-	static bool compare_devices(std::shared_ptr<device::Device> a,
-		std::shared_ptr<device::Device> b);
-
-private:
-	struct sr_context *const _sr_ctx;
-	std::list< std::shared_ptr<pv::device::Device> > _devices;
+protected:
+	std::shared_ptr<sigrok::Context> _context;
+	std::list< std::shared_ptr<sigrok::HardwareDevice> > _devices;
 };
 
 } // namespace pv

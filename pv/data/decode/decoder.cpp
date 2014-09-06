@@ -20,12 +20,13 @@
 
 #include <cassert>
 
-#include <libsigrok/libsigrok.h>
 #include <libsigrokdecode/libsigrokdecode.h>
 
 #include "decoder.h"
 
 #include <pv/view/logicsignal.h>
+
+#include <libsigrok/libsigrok.hpp>
 
 using std::set;
 using std::map;
@@ -139,7 +140,7 @@ srd_decoder_inst* Decoder::create_decoder_inst(srd_session *session, int unit_si
 	{
 		shared_ptr<view::LogicSignal> signal((*i).second);
 		GVariant *const gvar = g_variant_new_int32(
-			signal->channel()->index);
+			signal->channel()->get_index());
 		g_variant_ref_sink(gvar);
 		g_hash_table_insert(channels, (*i).first->id, gvar);
 	}
