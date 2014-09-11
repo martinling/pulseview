@@ -63,7 +63,7 @@ DecoderOptions::DecoderOptions(
 
 		const Property::Getter get = [&, opt]() {
 			return getter(opt->id); };
-		const Property::Setter set = [&, opt](GVariant *value) {
+		const Property::Setter set = [&, opt](Glib::VariantBase value) {
 			setter(opt->id, value); };
 
 		shared_ptr<Property> prop;
@@ -90,19 +90,18 @@ shared_ptr<Property> DecoderOptions::bind_enum(
 	const QString &name, const srd_decoder_option *option,
 	Property::Getter getter, Property::Setter setter)
 {
-	vector< pair<GVariant*, QString> > values;
+	vector< pair<Glib::VariantBase, QString> > values;
 	for (GSList *l = option->values; l; l = l->next) {
-		GVariant *const var = (GVariant*)l->data;
-		assert(var);
+		Glib::VariantBase var = Glib::VariantBase((GVariant*)l->data);
 		values.push_back(make_pair(var, print_gvariant(var)));
 	}
 
 	return shared_ptr<Property>(new Enum(name, values, getter, setter));
 }
 
-GVariant* DecoderOptions::getter(const char *id)
+Glib::VariantBase DecoderOptions::getter(const char *id)
 {
-	GVariant *val = NULL;
+	Glib::VariantBase val;
 
 	assert(_decoder);
 
@@ -111,7 +110,7 @@ GVariant* DecoderOptions::getter(const char *id)
 	const auto iter = options.find(id);
 
 	if (iter != options.end())
-		val = (*iter).second;
+		val = Glib::VariantBase((GVariant *)(*iter).second);
 	else
 	{
 		assert(_decoder->decoder());
@@ -122,22 +121,19 @@ GVariant* DecoderOptions::getter(const char *id)
 			const srd_decoder_option *const opt =
 				(srd_decoder_option*)l->data;
 			if (strcmp(opt->id, id) == 0) {
-				val = opt->def;
+				val = Glib::VariantBase(opt->def);
 				break;
 			}
 		}
 	}
 
-	if (val)
-		g_variant_ref(val);
-
 	return val;
 }
 
-void DecoderOptions::setter(const char *id, GVariant *value)
+void DecoderOptions::setter(const char *id, Glib::VariantBase value)
 {
 	assert(_decoder);
-	_decoder->set_option(id, value);
+	_decoder->set_option(id, value.gobj());
 
 	assert(_decoder_stack);
 	_decoder_stack->begin_decode();
