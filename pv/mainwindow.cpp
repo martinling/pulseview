@@ -43,7 +43,6 @@
 #include "mainwindow.h"
 
 #include "devicemanager.h"
-#include "device/device.h"
 #include "dialogs/about.h"
 #include "dialogs/connect.h"
 #include "dialogs/storeprogress.h"
@@ -54,18 +53,19 @@
 #include "widgets/decodermenu.h"
 #endif
 
-/* __STDC_FORMAT_MACROS is required for PRIu64 and friends (in C++). */
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <glib.h>
-#include <libsigrok/libsigrok.h>
+#include <libsigrok/libsigrok.hpp>
 
 using std::list;
 using std::map;
 using std::shared_ptr;
 using std::string;
+
+using sigrok::Device;
+using sigrok::HardwareDevice;
 
 namespace pv {
 
@@ -290,7 +290,8 @@ void MainWindow::save_ui_settings()
 		key_list.push_back("serial_num");
 		key_list.push_back("connection_id");
 
-		dev_info = _session.get_device()->get_device_info();
+		dev_info = _device_manager.get_device_info(
+			_session.get_device());
 
 		for (string key : key_list) {
 
@@ -309,7 +310,7 @@ void MainWindow::restore_ui_settings()
 {
 	QSettings settings;
 
-	shared_ptr<pv::device::DevInst> device;
+	shared_ptr<HardwareDevice> device;
 
 	map<string, string> dev_info;
 	list<string> key_list;
@@ -365,8 +366,8 @@ void MainWindow::update_device_list()
 {
 	assert(_sampling_bar);
 
-	shared_ptr<pv::device::DevInst> selected_device = _session.get_device();
-	list< shared_ptr<device::DevInst> > devices;
+	shared_ptr<Device> selected_device = _session.get_device();
+	list< shared_ptr<Device> > devices;
 
 	if (_device_manager.devices().size() == 0)
 		return;
@@ -516,7 +517,7 @@ void MainWindow::on_actionViewShowCursors_triggered()
 
 void MainWindow::on_actionAbout_triggered()
 {
-	dialogs::About dlg(this);
+	dialogs::About dlg(_device_manager.context(), this);
 	dlg.exec();
 }
 
